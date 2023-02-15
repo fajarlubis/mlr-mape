@@ -4,14 +4,19 @@ import (
 	"encoding/csv"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/sajari/regression"
+	"github.com/xuri/excelize/v2"
 )
 
 type Result struct {
 	Items []*ResultItem
+	Type  string
 	MAPE  float64
 }
 
@@ -43,8 +48,9 @@ func main() {
 	for label := 0; label <= 2; label++ { // there is 11 data label
 		// Extract the input and output data from the dataset
 		var (
-			x [][]float64
-			y []float64
+			x       [][]float64
+			y       []float64
+			kWhType string
 		)
 
 		for _, record := range records {
@@ -63,6 +69,15 @@ func main() {
 				log.Fatal(err)
 			}
 			y = append(y, yOut)
+
+			switch label + 2 {
+			case 2:
+				kWhType = "kWh Penerimaan"
+			case 3:
+				kWhType = "kWh Penjualan"
+			case 4:
+				kWhType = "Pemakaian Sendiri"
+			}
 		}
 
 		// Train the linear regression model
@@ -127,14 +142,195 @@ func main() {
 
 		res = append(res, &Result{
 			Items: items,
+			Type:  kWhType,
 			MAPE:  meanAbsolutePercentageError,
 		})
 	}
 
-	for _, v := range res {
-		for _, w := range v.Items {
-			fmt.Printf("%d-%02d: %.2f\n", w.Year, w.Month, w.Prediction)
-		}
-		fmt.Printf("Mean absolute percentage error: %.2f%%\n", v.MAPE)
+	// for _, v := range res {
+	// 	for _, w := range v.Items {
+	// 		fmt.Printf("%d-%02d: %.2f\n", w.Year, w.Month, w.Prediction)
+	// 	}
+	// 	fmt.Printf("Mean absolute percentage error: %.2f%%\n", v.MAPE)
+	// }
+
+	if err := export2(res); err != nil {
+		log.Fatalln(err)
 	}
+}
+
+func export2(data []*Result) error {
+	f := excelize.NewFile()
+	defer func() {
+		if err := f.Close(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+
+	var (
+		defaultSheet = "Sheet1"
+	)
+
+	// create a new sheet
+	index, err := f.NewSheet(defaultSheet)
+	if err != nil {
+		return err
+	}
+
+	var kWhType string
+	rowStartIdx := 1
+	for _, res := range data {
+		kWhType = res.Type
+
+		for _, v := range res.Items {
+			f.SetCellValue(defaultSheet, fmt.Sprintf("A%v", rowStartIdx), time.Month(v.Month))
+			f.SetCellInt(defaultSheet, fmt.Sprintf("B%v", rowStartIdx), v.Year)
+			f.SetCellFloat(defaultSheet, fmt.Sprintf("C%v", rowStartIdx), v.Prediction, 2, 64)
+			f.SetCellValue(defaultSheet, fmt.Sprintf("D%v", rowStartIdx), kWhType)
+
+			rowStartIdx += 1
+		}
+
+		f.SetCellValue(defaultSheet, fmt.Sprintf("A%v", rowStartIdx), fmt.Sprintf("MAPE: %v", res.MAPE))
+		rowStartIdx += 1
+	}
+
+	f.SetActiveSheet(index)
+	// save spreadsheet by the given path
+	if err := f.SaveAs("result.xlsx"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func export(res []*Result) error {
+	f := excelize.NewFile()
+	defer func() {
+		if err := f.Close(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+
+	var (
+		defaultSheet = "Sheet1"
+	)
+
+	// create a new sheet
+	index, err := f.NewSheet(defaultSheet)
+	if err != nil {
+		return err
+	}
+
+	// START CELL STYLE =========================================================================================== //
+
+	centeredStyle, _ := f.NewStyle(&excelize.Style{
+		Alignment: &excelize.Alignment{
+			Horizontal: "center",
+			Vertical:   "center",
+		},
+	})
+
+	boldYellowBgStyle, _ := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{
+			Bold: true,
+		},
+		Fill: excelize.Fill{Type: "pattern", Color: []string{"#ffff00"}, Pattern: 1},
+	})
+
+	// boldBlueBgStyle, _ := f.NewStyle(&excelize.Style{
+	// 	Font: &excelize.Font{
+	// 		Bold:  true,
+	// 		Color: "#ffffff",
+	// 	},
+	// 	Fill: excelize.Fill{Type: "pattern", Color: []string{"#1135d4"}, Pattern: 1},
+	// })
+
+	boldCenteredStyle, _ := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{
+			Bold: true,
+		},
+		Alignment: &excelize.Alignment{
+			Horizontal: "center",
+			Vertical:   "center",
+		},
+	})
+
+	customNumFmt := "#,##0.##"
+	thousandSeparatorNumberStyle, _ := f.NewStyle(&excelize.Style{CustomNumFmt: &customNumFmt})
+
+	// END CELL STYLE =========================================================================================== //
+
+	// START DEFINING ROW/COL SIZE =========================================================================================== //
+
+	f.SetColWidth(defaultSheet, "A", "A", 5)
+	f.SetColWidth(defaultSheet, "B", "B", 20)
+	f.SetColWidth(defaultSheet, "D", "O", 20)
+
+	// END DEFINING ROW/COL SIZE =========================================================================================== //
+
+	// START PRINTING PREDICTIONS =========================================================================================== //
+
+	rowStartIdx := 3 // starting point
+	for i, v := range res {
+		f.SetCellValue(defaultSheet, fmt.Sprintf("B%v", rowStartIdx+i), fmt.Sprintf("FORJA %v", v.MAPE))
+		f.SetCellValue(defaultSheet, fmt.Sprintf("D%v", rowStartIdx+1+i), "Bulan")
+
+		f.MergeCell(defaultSheet, fmt.Sprintf("D%v", rowStartIdx+1+i), fmt.Sprintf("O%v", rowStartIdx+1+i))
+		f.MergeCell(defaultSheet, fmt.Sprintf("A%v", rowStartIdx+1+i), fmt.Sprintf("A%v", rowStartIdx+2+i))
+		f.MergeCell(defaultSheet, fmt.Sprintf("B%v", rowStartIdx+1+i), fmt.Sprintf("B%v", rowStartIdx+2+i))
+		f.MergeCell(defaultSheet, fmt.Sprintf("C%v", rowStartIdx+1+i), fmt.Sprintf("C%v", rowStartIdx+2+i))
+
+		f.SetCellStyle(defaultSheet, fmt.Sprintf("A%v", rowStartIdx+1+i), fmt.Sprintf("O%v", rowStartIdx+2+i), boldCenteredStyle)
+		f.SetCellStyle(defaultSheet, fmt.Sprintf("B%v", rowStartIdx+i), fmt.Sprintf("B%v", rowStartIdx+i), boldYellowBgStyle)
+
+		no := 1
+		valueStartRowIdx := rowStartIdx + 3
+		for j, w := range v.Items {
+
+			monthNameStartColIdx := 4 // D
+			monthNameStartRowIdx := rowStartIdx + 2
+
+			f.SetCellValue(defaultSheet, fmt.Sprintf("A%v", monthNameStartRowIdx+i), "No.")
+			f.SetCellValue(defaultSheet, fmt.Sprintf("B%v", monthNameStartRowIdx+i), "Input")
+			f.SetCellValue(defaultSheet, fmt.Sprintf("C%v", monthNameStartRowIdx+i), "Satuan")
+
+			f.SetCellValue(defaultSheet, fmt.Sprintf("A%v", valueStartRowIdx+i), no)
+			f.SetCellValue(defaultSheet, fmt.Sprintf("B%v", valueStartRowIdx+i), j)
+			f.SetCellValue(defaultSheet, fmt.Sprintf("C%v", valueStartRowIdx+i), "kWh")
+
+			f.SetCellStyle(defaultSheet, fmt.Sprintf("A%v", valueStartRowIdx+i), fmt.Sprintf("A%v", valueStartRowIdx+i), centeredStyle)
+			f.SetCellStyle(defaultSheet, fmt.Sprintf("C%v", valueStartRowIdx+i), fmt.Sprintf("C%v", valueStartRowIdx+i), centeredStyle)
+
+			for m := time.January; m <= time.December; m++ {
+				f.SetCellValue(defaultSheet, fmt.Sprintf("%s%v", toChar(monthNameStartColIdx), monthNameStartRowIdx+i), m.String())
+				f.SetCellValue(defaultSheet, fmt.Sprintf("%s%v", toChar(monthNameStartColIdx), valueStartRowIdx+i), math.Round(w.Prediction))
+
+				f.SetCellStyle(defaultSheet, fmt.Sprintf("%s%v", toChar(monthNameStartColIdx), valueStartRowIdx+i), fmt.Sprintf("%s%v", toChar(monthNameStartColIdx), valueStartRowIdx+i), thousandSeparatorNumberStyle)
+
+				monthNameStartColIdx += 1
+			}
+
+			valueStartRowIdx += 1
+
+			no += 1
+
+		}
+
+		rowStartIdx += 14 // 14 is total length of populated rows for one year
+	}
+
+	// END PRINTING PREDICTIONS =========================================================================================== //
+
+	f.SetActiveSheet(index)
+	// save spreadsheet by the given path
+	if err := f.SaveAs("result.xlsx"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func toChar(i int) string {
+	return strings.Replace(string(rune('A'-1+i)), "'", "", -1)
 }
