@@ -10,6 +10,17 @@ import (
 	"github.com/sajari/regression"
 )
 
+type Result struct {
+	Items []*ResultItem
+	MAPE  float64
+}
+
+type ResultItem struct {
+	Year       int
+	Month      int
+	Prediction float64
+}
+
 func main() {
 	// Load the dataset from a CSV file
 	file, err := os.Open("energy_loss3.csv")
@@ -23,6 +34,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	var (
+		res   = make([]*Result, 0)
+		items = make([]*ResultItem, 0)
+	)
 
 	for label := 0; label <= 2; label++ { // there is 11 data label
 		// Extract the input and output data from the dataset
@@ -96,11 +112,29 @@ func main() {
 		meanAbsolutePercentageError := sum / float64(len(absoluteErrors))
 
 		// Print the predictions and the mean absolute percentage error
-		fmt.Println("Predictions:")
+		// fmt.Println("Predictions:")
 		for i, prediction := range predictions {
-			fmt.Printf("%d-%02d: %.2f\n", (i/12)+2019, (i%12)+1, prediction)
+			items = append(items, &ResultItem{
+				Year:       (i / 12) + 2019,
+				Month:      (i % 12) + 1,
+				Prediction: prediction,
+			})
+
+			// fmt.Printf("%d-%02d: %.2f\n", (i/12)+2019, (i%12)+1, prediction)
 		}
 
-		fmt.Printf("Mean absolute percentage error: %.2f%%\n", meanAbsolutePercentageError)
+		// fmt.Printf("Mean absolute percentage error: %.2f%%\n", meanAbsolutePercentageError)
+
+		res = append(res, &Result{
+			Items: items,
+			MAPE:  meanAbsolutePercentageError,
+		})
+	}
+
+	for _, v := range res {
+		for _, w := range v.Items {
+			fmt.Printf("%d-%02d: %.2f\n", w.Year, w.Month, w.Prediction)
+		}
+		fmt.Printf("Mean absolute percentage error: %.2f%%\n", v.MAPE)
 	}
 }
