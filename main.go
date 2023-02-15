@@ -12,7 +12,7 @@ import (
 
 func main() {
 	// Load the dataset from a CSV file
-	file, err := os.Open("energy_loss.csv")
+	file, err := os.Open("energy_loss3.csv")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -25,8 +25,10 @@ func main() {
 	}
 
 	// Extract the input and output data from the dataset
-	var x [][]float64
-	var y []float64
+	var (
+		x          [][]float64
+		y1, y2, y3 []float64
+	)
 
 	for _, record := range records {
 		var input []float64
@@ -39,11 +41,23 @@ func main() {
 		}
 		x = append(x, input)
 
-		output, err := strconv.ParseFloat(record[len(record)-1], 64)
+		y1Out, err := strconv.ParseFloat(record[2], 64)
 		if err != nil {
 			log.Fatal(err)
 		}
-		y = append(y, output)
+		y1 = append(y1, y1Out)
+
+		y2Out, err := strconv.ParseFloat(record[3], 64)
+		if err != nil {
+			log.Fatal(err)
+		}
+		y2 = append(y2, y2Out)
+
+		y3Out, err := strconv.ParseFloat(record[4], 64)
+		if err != nil {
+			log.Fatal(err)
+		}
+		y3 = append(y3, y3Out)
 	}
 
 	// Train the linear regression model
@@ -53,46 +67,52 @@ func main() {
 	r.SetVar(1, "year")
 
 	for i, xi := range x {
-		log.Println(y[i], xi)
-		r.Train(regression.DataPoint(y[i], xi))
+		r.Train(
+			regression.DataPoint(y1[i], xi),
+			regression.DataPoint(y2[i], xi),
+			regression.DataPoint(y3[i], xi),
+		)
 	}
 
 	r.Run()
 
-	// Use the trained model to make predictions for the next 5 years
-	var predictions []float64
-	for year := 2019; year <= 2023; year++ {
-		for month := 1; month <= 12; month++ {
-			input := []float64{float64(month), float64(year)}
-			prediction, err := r.Predict(input)
-			if err != nil {
-				log.Fatal(err)
-			}
-			predictions = append(predictions, prediction)
-		}
-	}
+	fmt.Printf("Regression formula:\n%v\n", r.Formula)
+	fmt.Printf("Regression:\n%s\n", r)
 
-	// Calculate the mean absolute percentage error of the predictions
-	var actual []float64
-	var absoluteErrors []float64
-	actual = append(actual, y...)
+	// // Use the trained model to make predictions for the next 5 years
+	// var predictions []float64
+	// for year := 2019; year <= 2023; year++ {
+	// 	for month := 1; month <= 12; month++ {
+	// 		input := []float64{float64(month), float64(year)}
+	// 		prediction, err := r.Predict(input)
+	// 		if err != nil {
+	// 			log.Fatal(err)
+	// 		}
+	// 		predictions = append(predictions, prediction)
+	// 	}
+	// }
 
-	for i, value := range predictions {
-		absoluteError := 100 * (actual[i] - value) / actual[i]
-		absoluteErrors = append(absoluteErrors, absoluteError)
-	}
+	// // Calculate the mean absolute percentage error of the predictions
+	// var actual []float64
+	// var absoluteErrors []float64
+	// actual = append(actual, y1...)
 
-	sum := 0.0
-	for _, error := range absoluteErrors {
-		sum += error
-	}
-	meanAbsolutePercentageError := sum / float64(len(absoluteErrors))
+	// for i, value := range predictions {
+	// 	absoluteError := 100 * (actual[i] - value) / actual[i]
+	// 	absoluteErrors = append(absoluteErrors, absoluteError)
+	// }
 
-	// Print the predictions and the mean absolute percentage error
-	fmt.Println("Predictions:")
-	for i, prediction := range predictions {
-		fmt.Printf("%d-%02d: %.2f\n", (i/12)+2019, (i%12)+1, prediction)
-	}
+	// sum := 0.0
+	// for _, error := range absoluteErrors {
+	// 	sum += error
+	// }
+	// meanAbsolutePercentageError := sum / float64(len(absoluteErrors))
 
-	fmt.Printf("Mean absolute percentage error: %.2f%%\n", meanAbsolutePercentageError)
+	// // Print the predictions and the mean absolute percentage error
+	// fmt.Println("Predictions:")
+	// for i, prediction := range predictions {
+	// 	fmt.Printf("%d-%02d: %.2f\n", (i/12)+2019, (i%12)+1, prediction)
+	// }
+
+	// fmt.Printf("Mean absolute percentage error: %.2f%%\n", meanAbsolutePercentageError)
 }
