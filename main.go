@@ -28,7 +28,7 @@ type ResultItem struct {
 
 func main() {
 	// Load the dataset from a CSV file
-	file, err := os.Open("energy_loss3.csv")
+	file, err := os.Open("training-data.csv")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func main() {
 		items = make([]*ResultItem, 0)
 	)
 
-	for label := 0; label <= 2; label++ { // there is 11 data label
+	for label := 0; label <= 10; label++ { // there is 11 data label
 		// Extract the input and output data from the dataset
 		var (
 			x       [][]float64
@@ -55,7 +55,7 @@ func main() {
 
 		for _, record := range records {
 			var input []float64
-			for i := 0; i < len(record)-3; i++ {
+			for i := 0; i < len(record)-11; i++ {
 				val, err := strconv.ParseFloat(record[i], 64)
 				if err != nil {
 					log.Fatal(err)
@@ -77,6 +77,22 @@ func main() {
 				kWhType = "kWh Penjualan"
 			case 4:
 				kWhType = "Pemakaian Sendiri"
+			case 5:
+				kWhType = "Kirim ke Unit Lain"
+			case 6:
+				kWhType = "Susut Teknis JTM"
+			case 7:
+				kWhType = "Susut Teknis JTR"
+			case 8:
+				kWhType = "Susut Teknis Trafo"
+			case 9:
+				kWhType = "Susut Teknis SR"
+			case 10:
+				kWhType = "Susut Total"
+			case 11:
+				kWhType = "Susut Teknis"
+			case 12:
+				kWhType = "Susut Non-Teknis"
 			}
 		}
 
@@ -99,7 +115,7 @@ func main() {
 
 		// Use the trained model to make predictions for the next 5 years
 		var predictions []float64
-		for year := 2019; year <= 2023; year++ {
+		for year := 2021; year <= 2025; year++ {
 			for month := 1; month <= 12; month++ {
 				input := []float64{float64(month), float64(year)}
 				prediction, err := r.Predict(input)
@@ -130,7 +146,7 @@ func main() {
 		// fmt.Println("Predictions:")
 		for i, prediction := range predictions {
 			items = append(items, &ResultItem{
-				Year:       (i / 12) + 2019,
+				Year:       (i / 12) + 2021,
 				Month:      (i % 12) + 1,
 				Prediction: prediction,
 			})
