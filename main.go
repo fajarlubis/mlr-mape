@@ -12,7 +12,7 @@ import (
 
 func main() {
 	// Load the dataset from a CSV file
-	file, err := os.Open("energy_loss.csv")
+	file, err := os.Open("energy_loss3.csv")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -26,13 +26,13 @@ func main() {
 
 	// Extract the input and output data from the dataset
 	var (
-		x  [][]float64
-		y1 []float64
+		x             [][]float64
+		kwhPenerimaan []float64
 	)
 
 	for _, record := range records {
 		var input []float64
-		for i := 0; i < len(record)-1; i++ {
+		for i := 0; i < len(record)-3; i++ {
 			val, err := strconv.ParseFloat(record[i], 64)
 			if err != nil {
 				log.Fatal(err)
@@ -41,11 +41,11 @@ func main() {
 		}
 		x = append(x, input)
 
-		y1Out, err := strconv.ParseFloat(record[2], 64)
+		kwhPenerimaanOut, err := strconv.ParseFloat(record[2], 64)
 		if err != nil {
 			log.Fatal(err)
 		}
-		y1 = append(y1, y1Out)
+		kwhPenerimaan = append(kwhPenerimaan, kwhPenerimaanOut)
 
 		// y2Out, err := strconv.ParseFloat(record[3], 64)
 		// if err != nil {
@@ -67,9 +67,8 @@ func main() {
 	r.SetVar(1, "year")
 
 	for i, xi := range x {
-		log.Println(y1[i], xi)
 		r.Train(
-			regression.DataPoint(y1[i], xi),
+			regression.DataPoint(kwhPenerimaan[i], xi),
 			// regression.DataPoint(y2[i], xi),
 			// regression.DataPoint(y3[i], xi),
 		)
@@ -77,8 +76,8 @@ func main() {
 
 	r.Run()
 
-	fmt.Printf("Regression formula:\n%v\n", r.Formula)
-	fmt.Printf("Regression:\n%s\n", r)
+	// fmt.Printf("Regression formula:\n%v\n", r.Formula)
+	// fmt.Printf("Regression:\n%s\n", r)
 
 	// Use the trained model to make predictions for the next 5 years
 	var predictions []float64
@@ -96,7 +95,7 @@ func main() {
 	// Calculate the mean absolute percentage error of the predictions
 	var actual []float64
 	var absoluteErrors []float64
-	actual = append(actual, y1...)
+	actual = append(actual, kwhPenerimaan...)
 
 	for i, value := range predictions {
 		absoluteError := 100 * (actual[i] - value) / actual[i]
