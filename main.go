@@ -113,6 +113,8 @@ func main() {
 		// fmt.Printf("Regression formula:\n%v\n", r.Formula)
 		// fmt.Printf("Regression:\n%s\n", r)
 
+		fmt.Printf("R^2:\n%v\n", r.R2)
+
 		// Use the trained model to make predictions for the next 5 years
 		var predictions []float64
 		for year := 2021; year <= 2025; year++ {
