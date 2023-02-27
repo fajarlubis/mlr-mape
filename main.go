@@ -147,7 +147,7 @@ func main() {
 			fmt.Printf("%d-%02d: %.2f\n", (i/12)+2019, (i%12)+1, prediction)
 		}
 
-		// fmt.Printf("Mean absolute percentage error: %.2f%%\n", meanAbsolutePercentageError)
+		fmt.Printf("Mean absolute percentage error: %.2f%%\n", meanAbsolutePercentageError)
 
 		// menyematkan data setiap item ke dalam variable result
 		res = append(res, &model.Result{
