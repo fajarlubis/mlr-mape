@@ -2,38 +2,14 @@ package main
 
 import (
 	"encoding/csv"
-	"fmt"
 	"log"
-	"math"
+	"mlr-mape/model"
+	"mlr-mape/printout"
 	"os"
-	"sort"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/sajari/regression"
-	"github.com/xuri/excelize/v2"
 )
-
-// struct untuk menampung data file csv
-type Result struct {
-	Items []*ResultItem
-	Type  string
-	MAPE  float64
-}
-
-// struct untuk menampung data item-item per bulan file csv
-type ResultItem struct {
-	Year       int
-	Month      int
-	Prediction float64
-}
-
-// struct untuk mapping data tahunan eksport ke xlsx file
-type YearlyData struct {
-	Year int
-	Data map[string]map[time.Month]float64
-}
 
 func main() {
 	// memuat dataset dari file csv
@@ -52,8 +28,8 @@ func main() {
 
 	var (
 		// definisi variable baru dari struct diatas
-		res   = make([]*Result, 0)
-		items = make([]*ResultItem, 0)
+		res   = make([]*model.Result, 0)
+		items = make([]*model.ResultItem, 0)
 	)
 
 	for label := 0; label <= 10; label++ { // ada 11 data label mulai dari kWh penerimaan sampai susut non-teknis, di buat 10 karena index dimulai dari 0
@@ -128,7 +104,7 @@ func main() {
 		// fmt.Printf("Regression formula:\n%v\n", r.Formula)
 		// fmt.Printf("Regression:\n%s\n", r)
 
-		fmt.Printf("R^2:\n%v\n", r.R2) // print hasil R^2 dari hasil training ke layar
+		// fmt.Printf("R^2:\n%v\n", r.R2) // print hasil R^2 dari hasil training ke layar
 
 		// inisialisasi variable untuk menampung data prediksi untuk 5 tahun kedepan
 		var predictions []float64
@@ -161,7 +137,7 @@ func main() {
 
 		// menyematkan data hasil prediksi dan MAPE ke dalam variable predictions untuk dapat di proses ke tahap selanjutnya
 		for i, prediction := range predictions {
-			items = append(items, &ResultItem{
+			items = append(items, &model.ResultItem{
 				Year:       (i / 12) + 2021, // tahun mulai yang akan di prediksi
 				Month:      (i % 12) + 1,    // bulan dalam angka
 				Prediction: prediction,
@@ -173,318 +149,118 @@ func main() {
 		// fmt.Printf("Mean absolute percentage error: %.2f%%\n", meanAbsolutePercentageError)
 
 		// menyematkan data setiap item ke dalam variable result
-		res = append(res, &Result{
+		res = append(res, &model.Result{
 			Items: items,
 			Type:  kWhType,
 			MAPE:  meanAbsolutePercentageError,
 		})
 	}
 
-	log.Println(res)
-
-	for _, v := range res {
-		log.Println(v.MAPE, v.Type)
-
-		for _, w := range v.Items {
-			log.Println(w.Month, w.Prediction, w.Year)
-		}
-	}
-}
-
-func WriteResult(dataset, predictions []YearlyData) error {
-	f := excelize.NewFile()
-	defer func() {
-		if err := f.Close(); err != nil {
-			fmt.Println(err)
-		}
-	}()
-
-	var (
-		defaultSheet = "Sheet1"
-		chartsSheet  = "Charts"
-	)
-
-	// create a new sheet
-	index, err := f.NewSheet(defaultSheet)
-	if err != nil {
-		return err
+	// ekspor hasil training ke dalam bentuk file xlsx
+	if err := printout.ExportLegacy(res); err != nil {
+		log.Fatalln(err) // jika error maka data tidak akan muncul di file result.xlsx
 	}
 
-	// create a new sheet for charts
-	_, err = f.NewSheet(chartsSheet)
-	if err != nil {
-		return err
-	}
+	// predictions := make([]YearlyData, 0)
 
-	// START CELL STYLE =========================================================================================== //
+	// // var year int
+	// for _, v := range res {
+	// 	// var currentYear int
+	// 	// fmt.Println("===================================================================>", v.MAPE, v.Type, "<===================================================================")
 
-	centeredStyle, _ := f.NewStyle(&excelize.Style{
-		Alignment: &excelize.Alignment{
-			Horizontal: "center",
-			Vertical:   "center",
-		},
-	})
+	// 	// for _, w := range v.Items {
+	// 	// 	currentYear = w.Year
 
-	boldYellowBgStyle, _ := f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Bold: true,
-		},
-		Fill: excelize.Fill{Type: "pattern", Color: []string{"#ffff00"}, Pattern: 1},
-	})
+	// 	// 	if currentYear != year {
+	// 	// 		year = currentYear
+	// 	// 		fmt.Println("=================================================================== --- ===================================================================")
+	// 	// 	}
 
-	boldBlueBgStyle, _ := f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Bold:  true,
-			Color: "#ffffff",
-		},
-		Fill: excelize.Fill{Type: "pattern", Color: []string{"#1135d4"}, Pattern: 1},
-	})
+	// 	// 	fmt.Println(time.Month(w.Month), w.Prediction, "Type", v.Type, "TAHUN", w.Year)
+	// 	// }
 
-	boldCenteredStyle, _ := f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Bold: true,
-		},
-		Alignment: &excelize.Alignment{
-			Horizontal: "center",
-			Vertical:   "center",
-		},
-	})
+	// 	// ----------------------------------
 
-	customNumFmt := "#,##0.##"
-	thousandSeparatorNumberStyle, _ := f.NewStyle(&excelize.Style{CustomNumFmt: &customNumFmt})
+	// 	switch v.Type {
+	// 	case "kWh Penerimaan":
+	// 		monthData := make(map[time.Month]float64, 0)
+	// 		yearData := make(map[string]map[time.Month]float64, 0)
 
-	// END CELL STYLE =========================================================================================== //
+	// 		var currentYear int
+	// 		for _, w := range v.Items {
+	// 			if currentYear != w.Year {
+	// 				predictions = append(predictions, YearlyData{
+	// 					Year: w.Year,
+	// 					Data: yearData,
+	// 				})
 
-	// START DEFINING ROW/COL SIZE =========================================================================================== //
+	// 				currentYear = w.Year
+	// 				monthData = make(map[time.Month]float64)
+	// 				yearData = make(map[string]map[time.Month]float64, 0)
 
-	f.SetColWidth(defaultSheet, "A", "A", 5)
-	f.SetColWidth(defaultSheet, "B", "B", 20)
-	f.SetColWidth(defaultSheet, "D", "O", 20)
+	// 				fmt.Println("=================================================================== --- ===================================================================")
+	// 				// continue
+	// 			}
 
-	// END DEFINING ROW/COL SIZE =========================================================================================== //
+	// 			monthData[time.Month(w.Month)] = w.Prediction
+	// 			yearData[v.Type] = monthData
 
-	// START PRINTING DEFAULT DATASET =========================================================================================== //
-	rowStartIdx := 3 // starting point
+	// 			fmt.Println(time.Month(w.Month), w.Prediction, "Type", v.Type, "TAHUN", w.Year)
+	// 		}
 
-	if dataset != nil {
-		sort.Slice(dataset, func(i, j int) bool {
-			return dataset[i].Year < dataset[j].Year
-		})
+	// 		fmt.Print("\n\n")
+	// 	case "kWh Penjualan":
+	// 		monthData := make(map[time.Month]float64, 0)
+	// 		yearData := make(map[string]map[time.Month]float64, 0)
 
-		for i, v := range dataset {
-			f.SetCellValue(defaultSheet, fmt.Sprintf("B%v", rowStartIdx+i), fmt.Sprintf("FORJA %v", v.Year))
-			f.SetCellValue(defaultSheet, fmt.Sprintf("D%v", rowStartIdx+1+i), "Bulan")
+	// 		var currentYear int
+	// 		for _, w := range v.Items {
+	// 			if currentYear != w.Year {
+	// 				predictions = append(predictions, YearlyData{
+	// 					Year: w.Year,
+	// 					Data: yearData,
+	// 				})
 
-			f.MergeCell(defaultSheet, fmt.Sprintf("D%v", rowStartIdx+1+i), fmt.Sprintf("O%v", rowStartIdx+1+i))
-			f.MergeCell(defaultSheet, fmt.Sprintf("A%v", rowStartIdx+1+i), fmt.Sprintf("A%v", rowStartIdx+2+i))
-			f.MergeCell(defaultSheet, fmt.Sprintf("B%v", rowStartIdx+1+i), fmt.Sprintf("B%v", rowStartIdx+2+i))
-			f.MergeCell(defaultSheet, fmt.Sprintf("C%v", rowStartIdx+1+i), fmt.Sprintf("C%v", rowStartIdx+2+i))
+	// 				currentYear = w.Year
+	// 				monthData = make(map[time.Month]float64)
+	// 				yearData = make(map[string]map[time.Month]float64, 0)
 
-			f.SetCellStyle(defaultSheet, fmt.Sprintf("A%v", rowStartIdx+1+i), fmt.Sprintf("O%v", rowStartIdx+2+i), boldCenteredStyle)
-			f.SetCellStyle(defaultSheet, fmt.Sprintf("B%v", rowStartIdx+i), fmt.Sprintf("B%v", rowStartIdx+i), boldYellowBgStyle)
+	// 				fmt.Println("=================================================================== --- ===================================================================")
+	// 				// continue
+	// 			}
 
-			keys := make([]string, 0, len(v.Data))
-			for key := range v.Data {
-				keys = append(keys, key)
-			}
+	// 			monthData[time.Month(w.Month)] = w.Prediction
+	// 			yearData[v.Type] = monthData
 
-			sort.Slice(keys, func(i, j int) bool {
-				return keys[i] < keys[j]
-			})
+	// 			fmt.Println(time.Month(w.Month), w.Prediction, "Type", v.Type, " TAHUN", w.Year)
+	// 		}
 
-			no := 1
-			valueStartRowIdx := rowStartIdx + 3
-			for _, j := range keys {
-				w := v.Data[j]
-
-				monthNameStartColIdx := 4 // D
-				monthNameStartRowIdx := rowStartIdx + 2
-
-				f.SetCellValue(defaultSheet, fmt.Sprintf("A%v", monthNameStartRowIdx+i), "No.")
-				f.SetCellValue(defaultSheet, fmt.Sprintf("B%v", monthNameStartRowIdx+i), "Input")
-				f.SetCellValue(defaultSheet, fmt.Sprintf("C%v", monthNameStartRowIdx+i), "Satuan")
-
-				f.SetCellValue(defaultSheet, fmt.Sprintf("A%v", valueStartRowIdx+i), no)
-				f.SetCellValue(defaultSheet, fmt.Sprintf("B%v", valueStartRowIdx+i), j)
-				f.SetCellValue(defaultSheet, fmt.Sprintf("C%v", valueStartRowIdx+i), "kWh")
-
-				f.SetCellStyle(defaultSheet, fmt.Sprintf("A%v", valueStartRowIdx+i), fmt.Sprintf("A%v", valueStartRowIdx+i), centeredStyle)
-				f.SetCellStyle(defaultSheet, fmt.Sprintf("C%v", valueStartRowIdx+i), fmt.Sprintf("C%v", valueStartRowIdx+i), centeredStyle)
-
-				for m := time.January; m <= time.December; m++ {
-					value, ok := w[m]
-					if !ok {
-						continue
-					}
-
-					f.SetCellValue(defaultSheet, fmt.Sprintf("%s%v", toChar(monthNameStartColIdx), monthNameStartRowIdx+i), m.String())
-					f.SetCellValue(defaultSheet, fmt.Sprintf("%s%v", toChar(monthNameStartColIdx), valueStartRowIdx+i), math.Round(value))
-
-					f.SetCellStyle(defaultSheet, fmt.Sprintf("%s%v", toChar(monthNameStartColIdx), valueStartRowIdx+i), fmt.Sprintf("%s%v", toChar(monthNameStartColIdx), valueStartRowIdx+i), thousandSeparatorNumberStyle)
-
-					monthNameStartColIdx += 1
-				}
-
-				valueStartRowIdx += 1
-
-				no += 1
-			}
-
-			rowStartIdx += 14 // 14 is total length of populated rows for one year
-		}
-	}
-
-	// END PRINTING DEFAULT DATASET =========================================================================================== //
-
-	// START PRINTING PREDICTIONS =========================================================================================== //
-
-	if dataset != nil {
-		rowStartIdx = 78 // starting point
-	}
-
-	sort.Slice(predictions, func(i, j int) bool {
-		return predictions[i].Year < predictions[j].Year
-	})
-
-	for i, v := range predictions {
-		f.SetCellValue(defaultSheet, fmt.Sprintf("B%v", rowStartIdx+i), fmt.Sprintf("FORJA %v", v.Year))
-		f.SetCellValue(defaultSheet, fmt.Sprintf("D%v", rowStartIdx+1+i), "Bulan")
-
-		f.MergeCell(defaultSheet, fmt.Sprintf("D%v", rowStartIdx+1+i), fmt.Sprintf("O%v", rowStartIdx+1+i))
-		f.MergeCell(defaultSheet, fmt.Sprintf("A%v", rowStartIdx+1+i), fmt.Sprintf("A%v", rowStartIdx+2+i))
-		f.MergeCell(defaultSheet, fmt.Sprintf("B%v", rowStartIdx+1+i), fmt.Sprintf("B%v", rowStartIdx+2+i))
-		f.MergeCell(defaultSheet, fmt.Sprintf("C%v", rowStartIdx+1+i), fmt.Sprintf("C%v", rowStartIdx+2+i))
-
-		f.SetCellStyle(defaultSheet, fmt.Sprintf("A%v", rowStartIdx+1+i), fmt.Sprintf("O%v", rowStartIdx+2+i), boldCenteredStyle)
-		f.SetCellStyle(defaultSheet, fmt.Sprintf("B%v", rowStartIdx+i), fmt.Sprintf("B%v", rowStartIdx+i), boldBlueBgStyle)
-
-		keys := make([]string, 0, len(v.Data))
-		for key := range v.Data {
-			keys = append(keys, key)
-		}
-
-		sort.Slice(keys, func(i, j int) bool {
-			return keys[i] < keys[j]
-		})
-
-		no := 1
-		valueStartRowIdx := rowStartIdx + 3
-		for _, j := range keys {
-			w := v.Data[j]
-
-			monthNameStartColIdx := 4 // D
-			monthNameStartRowIdx := rowStartIdx + 2
-
-			f.SetCellValue(defaultSheet, fmt.Sprintf("A%v", monthNameStartRowIdx+i), "No.")
-			f.SetCellValue(defaultSheet, fmt.Sprintf("B%v", monthNameStartRowIdx+i), "Input")
-			f.SetCellValue(defaultSheet, fmt.Sprintf("C%v", monthNameStartRowIdx+i), "Satuan")
-
-			f.SetCellValue(defaultSheet, fmt.Sprintf("A%v", valueStartRowIdx+i), no)
-			f.SetCellValue(defaultSheet, fmt.Sprintf("B%v", valueStartRowIdx+i), j)
-			f.SetCellValue(defaultSheet, fmt.Sprintf("C%v", valueStartRowIdx+i), "kWh")
-
-			f.SetCellStyle(defaultSheet, fmt.Sprintf("A%v", valueStartRowIdx+i), fmt.Sprintf("A%v", valueStartRowIdx+i), centeredStyle)
-			f.SetCellStyle(defaultSheet, fmt.Sprintf("C%v", valueStartRowIdx+i), fmt.Sprintf("C%v", valueStartRowIdx+i), centeredStyle)
-
-			for m := time.January; m <= time.December; m++ {
-				value, ok := w[m]
-				if !ok {
-					continue
-				}
-
-				f.SetCellValue(defaultSheet, fmt.Sprintf("%s%v", toChar(monthNameStartColIdx), monthNameStartRowIdx+i), m.String())
-				f.SetCellValue(defaultSheet, fmt.Sprintf("%s%v", toChar(monthNameStartColIdx), valueStartRowIdx+i), math.Round(value))
-
-				f.SetCellStyle(defaultSheet, fmt.Sprintf("%s%v", toChar(monthNameStartColIdx), valueStartRowIdx+i), fmt.Sprintf("%s%v", toChar(monthNameStartColIdx), valueStartRowIdx+i), thousandSeparatorNumberStyle)
-
-				monthNameStartColIdx += 1
-			}
-
-			valueStartRowIdx += 1
-
-			no += 1
-		}
-
-		rowStartIdx += 14 // 14 is total length of populated rows for one year
-	}
-
-	// END PRINTING PREDICTIONS =========================================================================================== //
-
-	// for idx, row := range [][]interface{}{
-	// 	{nil, "Apple", "Orange", "Pear"},
-	// 	{"Small", 2, 3, 3},
-	// 	{"Normal", 5, 2, 4},
-	// 	{"Large", 6, 7, 8},
-	// } {
-	// 	cell, err := excelize.CoordinatesToCellName(1, idx+1)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	if err := f.SetSheetRow(chartsSheet, cell, &row); err != nil {
-	// 		return err
+	// 		fmt.Print("\n\n")
 	// 	}
 	// }
-	// if err := f.AddChart(chartsSheet, "E1", &excelize.Chart{
-	// 	Type: "line",
-	// 	Series: []excelize.ChartSeries{
-	// 		{
-	// 			Name:       fmt.Sprintf("%s!$A$2", chartsSheet),
-	// 			Categories: fmt.Sprintf("%s!$B$1:$D$1", chartsSheet),
-	// 			Values:     fmt.Sprintf("%s!$B$2:$D$2", chartsSheet),
-	// 			Line: excelize.ChartLine{
-	// 				Smooth: true,
-	// 			},
-	// 		},
-	// 		{
-	// 			Name:       fmt.Sprintf("%s!$A$3", chartsSheet),
-	// 			Categories: fmt.Sprintf("%s!$B$1:$D$1", chartsSheet),
-	// 			Values:     fmt.Sprintf("%s!$B$3:$D$3", chartsSheet),
-	// 			Line: excelize.ChartLine{
-	// 				Smooth: true,
-	// 			},
-	// 		},
-	// 		{
-	// 			Name:       fmt.Sprintf("%s!$A$4", chartsSheet),
-	// 			Categories: fmt.Sprintf("%s!$B$1:$D$1", chartsSheet),
-	// 			Values:     fmt.Sprintf("%s!$B$4:$D$4", chartsSheet),
-	// 			Line: excelize.ChartLine{
-	// 				Smooth: true,
-	// 			},
-	// 		},
-	// 	},
-	// 	Format: excelize.GraphicOptions{
-	// 		OffsetX: 15,
-	// 		OffsetY: 10,
-	// 	},
-	// 	Legend: excelize.ChartLegend{
-	// 		Position: "top",
-	// 	},
-	// 	Title: excelize.ChartTitle{
-	// 		Name: "Fruit Line Chart",
-	// 	},
-	// 	PlotArea: excelize.ChartPlotArea{
-	// 		ShowCatName:     false,
-	// 		ShowLeaderLines: false,
-	// 		ShowPercent:     true,
-	// 		ShowSerName:     true,
-	// 		ShowVal:         true,
-	// 	},
-	// 	ShowBlanksAs: "zero",
-	// }); err != nil {
-	// 	return err
+
+	// for _, v := range predictions {
+	// 	for j, w := range v.Data {
+	// 		fmt.Print(v.Year, j, w, "\n\n")
+	// 	}
 	// }
 
-	// set active sheet of the workbook
-	f.SetActiveSheet(index)
-	// save spreadsheet by the given path
-	// if err := f.SaveAs(fmt.Sprintf(model.OutputFile, dataset[0].Year, predictions[len(predictions)-1].Year)); err != nil {
-	if err := f.SaveAs("result.xlsx"); err != nil {
-		return err
-	}
+	// // for _, v := range res {
+	// // 	var currentYear int
+	// // 	for _, w := range v.Items {
+	// // 		currentYear = w.Year
 
-	return nil
-}
+	// // 		monthData[time.Month(w.Month)] = w.Prediction
+	// // 		yearData[v.Type] = monthData
+	// // 	}
 
-func toChar(i int) string {
-	return strings.Replace(string(rune('A'-1+i)), "'", "", -1)
+	// // 	predictions = append(predictions, YearlyData{
+	// // 		Year: currentYear,
+	// // 		Data: yearData,
+	// // 	})
+	// // }
+
+	// if err := writeResult(nil, predictions); err != nil {
+	// 	log.Println(err)
+	// }
 }
