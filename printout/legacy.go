@@ -44,19 +44,19 @@ func ExportLegacy(data []*model.Result) error {
 		resultData := Parse(res.Items, res.Type, res.MAPE)
 
 		rowStartIndex := 1
-		for year, v := range resultData.Items {
-			fmt.Println(year)
+		for year, _ := range resultData.Items {
+			// fmt.Println(year)
 
 			f.SetCellValue(formattedSheet, fmt.Sprintf("A%v", rowStartIndex), year)
 
-			rrr := 1
-			for month, value := range v {
-				f.SetCellValue(formattedSheet, fmt.Sprintf("A%v", rrr), resultData.Type)
-				fmt.Println(time.Month(month), value)
+			// rrr := 1
+			// for month, value := range v {
+			// 	f.SetCellValue(formattedSheet, fmt.Sprintf("A%v", rrr), resultData.Type)
+			// 	fmt.Println(time.Month(month), value)
 
-				rrr += 1
-			}
-			rrr += 13
+			// 	rrr += 1
+			// }
+			// rrr += 13
 
 			rowStartIndex += 13
 		}

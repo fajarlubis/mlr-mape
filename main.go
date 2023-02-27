@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/csv"
+	"fmt"
 	"log"
 	"mlr-mape/model"
 	"mlr-mape/printout"
@@ -101,10 +102,10 @@ func main() {
 
 		r.Run() // start training data sesuai dengan instruksi dan nilai yang telah diberikan
 
-		// fmt.Printf("Regression formula:\n%v\n", r.Formula)
+		fmt.Printf("\nRegression formula:\n%v\n", r.Formula)
 		// fmt.Printf("Regression:\n%s\n", r)
 
-		// fmt.Printf("R^2:\n%v\n", r.R2) // print hasil R^2 dari hasil training ke layar
+		fmt.Printf("R^2:\n%v\n\n", r.R2) // print hasil R^2 dari hasil training ke layar
 
 		// inisialisasi variable untuk menampung data prediksi untuk 5 tahun kedepan
 		var predictions []float64
@@ -143,7 +144,7 @@ func main() {
 				Prediction: prediction,
 			})
 
-			// fmt.Printf("%d-%02d: %.2f\n", (i/12)+2019, (i%12)+1, prediction)
+			fmt.Printf("%d-%02d: %.2f\n", (i/12)+2019, (i%12)+1, prediction)
 		}
 
 		// fmt.Printf("Mean absolute percentage error: %.2f%%\n", meanAbsolutePercentageError)
